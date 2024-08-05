@@ -12,6 +12,8 @@ def print_with_color(text, color):
         "magenta": "\033[95m",
         "cyan": "\033[96m",
         "white": "\033[97m",
+        "purple": "\033[35m",  # Using magenta for purple
+        "orange": "\033[33m",  # Using yellow for orange (approximate)
     }
     end_code = "\033[0m"
     
@@ -167,14 +169,34 @@ def create_tarball(temp_dir, tar_path):
                 tar.add(file_path, arcname=arcname)
 
 def get_user_input():
+
+    log_type_mapping = {
+        "0": "all",
+        "1": "network",
+        "2": "compute",
+        "3": "storage",
+        "4": "security"
+    }
+
     print_with_color("Choose log types to collect (separate multiple choices with commas):", "cyan")
+    print_with_color("0. all", "")
     print_with_color("1. network", "green")
     print_with_color("2. compute", "blue")
     print_with_color("3. storage", "yellow")
     print_with_color("4. security", "magenta")
-    user_input = input("Enter your choices: ")
-    log_types = [choice.strip() for choice in user_input.split(',')]
+    user_input = input("Enter your choices(1-4): ")
+    selected_numbers = [choice.strip() for choice in user_input.split(',')]
+    
+    # Validate and convert the selected numbers to log types
+    log_types = []
+    for number in selected_numbers:
+        if number in log_type_mapping:
+            log_types.append(log_type_mapping[number])
+        else:
+            print_with_color(f"Invalid choice: {number}. Skipping.", "red")
+    
     return log_types
+
 
 if __name__ == "__main__":
     log_types = get_user_input()
