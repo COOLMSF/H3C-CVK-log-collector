@@ -52,6 +52,7 @@ def run_commands_and_collect_logs(temp_dir, log_types):
     ]
 
     commands = {
+        'all': [],
         'network': [
 
             # 日志文件
@@ -114,7 +115,8 @@ def run_commands_and_collect_logs(temp_dir, log_types):
         ],
         'security': [
             ['cat', '/var/log/auth.log', 'auth.log'],
-            ['cat', '/var/log/secure', 'secure']
+            ['cat', '/var/log/secure', 'secure'],
+            ['cat', '/var/log/frr/bgpd.log-20240805.gz', 'bgpd.log-20240805.gz']
         ]
     }
 
@@ -124,6 +126,11 @@ def run_commands_and_collect_logs(temp_dir, log_types):
         for command in common_commands:
             commands[key].append(command)
 
+    # 收集所有日志，选项0，把所有其他的选项都包含进来
+    # Populate the 'all' key with all commands from other keys
+    for key in commands:
+        if key != 'all':
+            commands['all'].extend(commands[key])
 
     collected_logs = {}
 
@@ -134,12 +141,12 @@ def run_commands_and_collect_logs(temp_dir, log_types):
         if log_type in commands:
             for idx, command in enumerate(commands[log_type]):
                 try:
-                    log_name = f"{log_type}_{command[-1]}.log"
+                    log_name = f"{log_type}_{command[-1]}"
                     print("Executing: ")
                     print_with_color(command[0:-1], "green")
-                    output = subprocess.check_output(command[0:-1]).decode('utf-8').strip()
+                    output = subprocess.check_output(command[0:-1])
                     log_path = os.path.join(temp_dir, log_name)
-                    with open(log_path, 'w', encoding='utf-8') as log_file:
+                    with open(log_path, 'wb') as log_file:
                         log_file.write(output)
                     collected_logs[log_name] = log_path
                 except subprocess.CalledProcessError as e:
@@ -179,7 +186,7 @@ def get_user_input():
     }
 
     print_with_color("Choose log types to collect (separate multiple choices with commas):", "cyan")
-    print_with_color("0. all", "")
+    print_with_color("0. all", "purple")
     print_with_color("1. network", "green")
     print_with_color("2. compute", "blue")
     print_with_color("3. storage", "yellow")
