@@ -3,6 +3,8 @@ import subprocess
 import tempfile
 import tarfile
 
+LAST_NDAYS = 3
+
 common_err_msgs = {
     "err",
     "error", 
@@ -39,13 +41,14 @@ def run_commands_and_collect_logs(temp_dir, log_types):
 
     common_commands = [
 
+        # 服务状态
+        ['bash', '-c', 'for service in cvk-agent cvk-ha network-cvk-agent openvswitch ovn-northd frr; do echo "$service: $(systemctl is-active $service)"; done', 'network-service-status'],
+
         # 日志文件
-        ['systemctl', 'is-active', 'cvk-agent', 'systemctl-cvk-agent-status-log'],
-        ['systemctl', 'is-active', 'cvk-ha', 'systemctl-cvk-ha-status-log'],
-        ['systemctl', 'is-active', 'network-cvk-agent', 'systemctl-network-cvk-agent-status-log'],
-        ['systemctl', 'is-active', 'openvswitch', 'systemctl-openvswitch-status-log'],
-        ['systemctl', 'is-active', 'ovn-northd', 'systemctl-ovn-northd-status-log'],
-        ['systemctl', 'is-active', 'frr', 'systemctl-frr-status-log'],
+        # TODO: convert dmesg timestap
+        ['dmesg', 'dmesg'], 
+        ['cat', '/var/log/messages', 'messages-log'],
+        ['cat', '/var/log/dmesg.old', 'dmesg-old-log'], 
 
         # 配置文件
 
@@ -57,32 +60,25 @@ def run_commands_and_collect_logs(temp_dir, log_types):
         ['uname', '-a', 'uname'],
         ['lscpu', 'cpuinfo'], 
         ['free', '-h', 'meminfo'],
+
     ]
 
     commands = {
         'all': [],
         'network': [
 
-            # 日志文件
-            ['cat', '/var/log/messages', 'messages-log'],
-            ['cat', '/var/log/network-cvk-agent/network-cvk-agent.log', 'network-cvk-agent-log'],
-            ['cat', '/var/log/network-audit-agent/network-audit-agent.log', 'network-audit-agent-log'],
-
+            # network-cvk-agent
+            ['sh', '-c', f'find /var/log/network-cvk-agent/ -type f -mtime -{LAST_NDAYS} | tar -czf /tmp/network-cvk-agent.tar.gz -T - && cat /tmp/network-cvk-agent.tar.gz', 'network-cvk-agent.tar.gz'],
+            # network-audit-agent
+            ['sh', '-c', f'find /var/log/network-audit-agent/ -type f -mtime -{LAST_NDAYS} | tar -czf /tmp/network-audit-agent.tar.gz -T - && cat /tmp/network-audit-agent.tar.gz', 'network-audit-agent.tar.gz'],
             # frr
-            ['cat', '/var/log/frr/bgpd.log', 'frr-log'],
-            ['cat', '/var/log/frr/ospfd.log', 'ospfd-log'],
-            ['cat', '/var/log/frr/zebra.log', 'zebra-log'],
+            ['sh', '-c', f'find /var/log/frr/ -type f -mtime -{LAST_NDAYS} | tar -czf /tmp/frr.tar.gz -T - && cat /tmp/frr.tar.gz', 'frr.tar.gz'],
 
             # ovn
-            ['cat', '/var/log/ovn/ovn-controller.log', 'ovn-controller-log'],
-            ['cat', '/var/log/ovn/ovn-northd.log', 'ovn-northd-log'],
-            ['cat', '/var/log/ovn/ovsdb-server-nb.log', 'ovsdb-server-nb-log'],
-            ['cat', '/var/log/ovn/ovsdb-server-sb.log', 'ovsdb-server-sb-log'],
-
+            ['sh', '-c', f'find /var/log/ovn/ -type f -mtime -{LAST_NDAYS} | tar -czf /tmp/ovn.tar.gz -T - && cat /tmp/ovn.tar.gz', 'ovn.tar.gz'],
+            
             # openvswitch
-            ['cat', '/var/log/openvswitch/ovs-vswitchd.log', 'ovs-vswitchd-log'],
-            ['cat', '/var/log/openvswitch/ovs-ctl.log', 'ovs-ctl-log'],
-            ['cat', '/var/log/openvswitch/ovsdb-server.log', 'ovsdb-server-log'],
+            ['sh', '-c', f'find /var/log/openvswitch/ -type f -mtime -{LAST_NDAYS} | tar -czf /tmp/openvswitch.tar.gz -T - && cat /tmp/openvswitch.tar.gz', 'openvswitch.tar.gz'],
 
             # 配置文件
             ['cat', '/etc/cvk-agent/cvk-agent.yaml', 'cvk-agent-yaml'],
@@ -91,20 +87,12 @@ def run_commands_and_collect_logs(temp_dir, log_types):
             ['cat', '/etc/frr/bgpd.conf', 'frr-config'],
 
             # 版本信息
-            ['sh', '-c', 'rpm -qa | grep cvk-agent', 'cvk-agent-version'],
-            ['sh', '-c', 'rpm -qa | grep network-cvk-agent', 'network-cvk-agent-version'],
-            ['sh', '-c', 'rpm -qa | grep openvswitch', 'openvswitch-version'],
-            ['sh', '-c', 'rpm -qa | grep ovn', 'ovn-version'],
-            ['sh', '-c', 'rpm -qa | grep frr', 'frr-version'],
-
+            ['sh', '-c', 'rpm -qa | grep -E "cvk-agent|network-cvk-agent|openvswitch|ovn|frr"', 'cvk-agent', 'network-component-version'],
             # 其他信息
 
         ],
-        # TODO: convert dmesg timestap
         'compute': [
             # 日志文件
-            ['dmesg', 'dmesg'], 
-            ['cat', '/var/log/dmesg.old', 'dmesg-old-log'], 
             ['cat', '/var/log/cvk-ha/cvk-ha.log', 'cvk-ha-log'],
             ['cat', '/var/log/libvirt/libvirtd.log', 'libvirt-log'],
 
@@ -113,8 +101,7 @@ def run_commands_and_collect_logs(temp_dir, log_types):
 
             # 版本信息
             ['cat', '/etc/cas_cvk-version', 'cas_cvk-version'],
-            ['sh', '-c', 'rpm -qa | grep cvk-agent', 'cvk-agent'],
-            ['sh', '-c', 'rpm -qa | grep cvk-ha', 'cvk-ha'],
+            ['sh', '-c', 'rpm -qa | grep -E cvk-agent|cvk-ha', 'compute-component-version'],
 
             # 其他信息
         ],
@@ -124,7 +111,6 @@ def run_commands_and_collect_logs(temp_dir, log_types):
         'security': [
             ['cat', '/var/log/auth.log', 'auth.log'],
             ['cat', '/var/log/secure', 'secure'],
-            ['cat', '/var/log/frr/bgpd.log-20240805.gz', 'bgpd.log-20240805.gz']
         ]
     }
 
@@ -133,6 +119,8 @@ def run_commands_and_collect_logs(temp_dir, log_types):
         # Append each command in common_commands to the list associated with the key
         for command in common_commands:
             commands[key].append(command)
+
+        # commands[key] = list(set(commands[key]))
 
     # 收集所有日志，选项0，把所有其他的选项都包含进来
     # Populate the 'all' key with all commands from other keys
