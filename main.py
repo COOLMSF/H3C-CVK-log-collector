@@ -3,6 +3,16 @@ import subprocess
 import tempfile
 import tarfile
 
+common_err_msgs = {
+    "err",
+    "error", 
+    "failed",
+    "fail",
+    "failure",
+    "not found"
+    "unhealthy",
+}
+
 def print_with_color(text, color):
     color_codes = {
         "red": "\033[91m",
@@ -47,8 +57,6 @@ def run_commands_and_collect_logs(temp_dir, log_types):
         ['uname', '-a', 'uname'],
         ['lscpu', 'cpuinfo'], 
         ['free', '-h', 'meminfo'],
-
-
     ]
 
     commands = {
@@ -145,6 +153,13 @@ def run_commands_and_collect_logs(temp_dir, log_types):
                     print("Executing: ")
                     print_with_color(command[0:-1], "green")
                     output = subprocess.check_output(command[0:-1])
+
+                    # 检查是否存在错误信息
+                    # for msg in common_err_msgs:
+                    #     if msg in output.decode():
+                    #         print_with_color(f"Running {output} failed", "red")
+                    #         print_with_color(output, "red")
+
                     log_path = os.path.join(temp_dir, log_name)
                     with open(log_path, 'wb') as log_file:
                         log_file.write(output)
