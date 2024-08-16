@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 import tarfile
 
-LAST_NDAYS = 3
+g_last_ndays = 3
 
 common_err_msgs = {
     "err",
@@ -52,7 +52,17 @@ def run_commands_and_collect_logs(temp_dir, log_types):
         # 配置文件
 
         # 主机信息
-        ['sh', '-c', 'echo -e "$(hostname)\n\n$(df -h)\n\n$(uname -a)\n\n$(free -h)\n\n$(cat /etc/cas_cvk-version)\n\n$(lscpu)\n\n$(mpstat -A)"', 'host-info', 'info'],
+    #     ['sh', '-c', 
+    #      'echo -e "Host Info:\n\n$(hostname)\n\nKernel Version:\n\n$(uname -a)\n\nDisk Info:\n\n$(df -h)\n\nMem Info:\n\n$(free -h)\n\nCVK Version:\n\n$(cat /etc/cas_cvk-version)\n\nCPU Info: $(lscpu | grep -E "Architecture|Vendor ID|Model name")\n\nCPU Utilization: $(mpstat -A)\n\n"', 
+    #      'host-info', 'info'],
+    # ]
+        ['sh', '-c', 
+         'echo -e "\
+            Host Info:\n\n \
+            $(hostname)\n\n \
+            Kernel Version:\n\n \
+            $(uname -a)\n\nDisk Info:\n\n$(df -h)\n\nMem Info:\n\n$(free -h)\n\nCVK Version:\n\n$(cat /etc/cas_cvk-version)\n\nCPU Info: $(lscpu | grep -E "Architecture|Vendor ID|Model name")\n\nCPU Utilization: $(mpstat -A)\n\n"', 
+         'host-info', 'info'],
     ]
 
     commands = {
@@ -60,17 +70,17 @@ def run_commands_and_collect_logs(temp_dir, log_types):
         'network': [
 
             # network-cvk-agent
-            ['sh', '-c', f'find /var/log/network-cvk-agent/ -type f -mtime -{LAST_NDAYS} | tar -czf /tmp/network-cvk-agent.tar.gz -T - && cat /tmp/network-cvk-agent.tar.gz', 'network-cvk-agent.tar.gz', 'log'],
+            ['sh', '-c', f'find /var/log/network-cvk-agent/ -type f -mtime -{g_last_ndays} | tar -czf /tmp/network-cvk-agent.tar.gz -T - && cat /tmp/network-cvk-agent.tar.gz', 'network-cvk-agent.tar.gz', 'log'],
             # network-audit-agent
-            ['sh', '-c', f'find /var/log/network-audit-agent/ -type f -mtime -{LAST_NDAYS} | tar -czf /tmp/network-audit-agent.tar.gz -T - && cat /tmp/network-audit-agent.tar.gz', 'network-audit-agent.tar.gz', 'log'],
+            ['sh', '-c', f'find /var/log/network-audit-agent/ -type f -mtime -{g_last_ndays} | tar -czf /tmp/network-audit-agent.tar.gz -T - && cat /tmp/network-audit-agent.tar.gz', 'network-audit-agent.tar.gz', 'log'],
             # frr
-            ['sh', '-c', f'find /var/log/frr/ -type f -mtime -{LAST_NDAYS} | tar -czf /tmp/frr.tar.gz -T - && cat /tmp/frr.tar.gz', 'frr.tar.gz', 'log'],
+            ['sh', '-c', f'find /var/log/frr/ -type f -mtime -{g_last_ndays} | tar -czf /tmp/frr.tar.gz -T - && cat /tmp/frr.tar.gz', 'frr.tar.gz', 'log'],
 
             # ovn
-            ['sh', '-c', f'find /var/log/ovn/ -type f -mtime -{LAST_NDAYS} | tar -czf /tmp/ovn.tar.gz -T - && cat /tmp/ovn.tar.gz', 'ovn.tar.gz', 'log'],
+            ['sh', '-c', f'find /var/log/ovn/ -type f -mtime -{g_last_ndays} | tar -czf /tmp/ovn.tar.gz -T - && cat /tmp/ovn.tar.gz', 'ovn.tar.gz', 'log'],
             
             # openvswitch
-            ['sh', '-c', f'find /var/log/openvswitch/ -type f -mtime -{LAST_NDAYS} | tar -czf /tmp/openvswitch.tar.gz -T - && cat /tmp/openvswitch.tar.gz', 'openvswitch.tar.gz', 'log'],
+            ['sh', '-c', f'find /var/log/openvswitch/ -type f -mtime -{g_last_ndays} | tar -czf /tmp/openvswitch.tar.gz -T - && cat /tmp/openvswitch.tar.gz', 'openvswitch.tar.gz', 'log'],
 
             # 配置文件
             ['cat', '/etc/cvk-agent/cvk-agent.yaml', 'cvk-agent-yaml', 'config'],
@@ -162,6 +172,10 @@ def create_tarball(temp_dir, tar_path):
 
 def get_user_input():
 
+    print_with_color("How many days of logs to collect?(default 3 days)", "cyan")
+    global g_last_ndays
+    g_last_ndays = input()
+
     log_type_mapping = {
         "0": "all",
         "1": "network",
@@ -170,23 +184,26 @@ def get_user_input():
         "4": "security"
     }
 
-    print_with_color("Choose log types to collect (separate multiple choices with commas):", "cyan")
-    print_with_color("0. all", "purple")
-    print_with_color("1. network", "green")
-    print_with_color("2. compute", "blue")
-    print_with_color("3. storage", "yellow")
-    print_with_color("4. security", "magenta")
-    user_input = input("Enter your choices(1-4): ")
-    selected_numbers = [choice.strip() for choice in user_input.split(',')]
+    # print_with_color("Choose log types to collect (separate multiple choices with commas):", "cyan")
+    # print_with_color("0. all", "purple")
+    # print_with_color("1. network", "green")
+    # print_with_color("2. compute", "blue")
+    # print_with_color("3. storage", "yellow")
+    # print_with_color("4. security", "magenta")
+    # user_input = input("Enter your choices(1-4): ")
+    # selected_numbers = [choice.strip() for choice in user_input.split(',')]
     
     # Validate and convert the selected numbers to log types
-    log_types = []
-    for number in selected_numbers:
-        if number in log_type_mapping:
-            log_types.append(log_type_mapping[number])
-        else:
-            print_with_color(f"Invalid choice: {number}. Skipping.", "red")
-    
+    #nlog_types = []
+    #nfor number in selected_numbers:
+    #n    if number in log_type_mapping:
+    #n        log_types.append(log_type_mapping[number])
+    #n    else:
+    #n        print_with_color(f"Invalid choice: {number}. Skipping.", "red")
+
+    # 只收集所有日志，不区分计算和网络
+    log_types = ["all"]
+
     return log_types
 
 
