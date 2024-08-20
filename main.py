@@ -97,6 +97,7 @@ def run_commands_and_collect_logs(temp_dir, log_types):
             # 日志文件
             ['cat', '/var/log/cvk-ha/cvk-ha.log', 'cvk-ha-log', 'log'],
             ['cat', '/var/log/libvirt/libvirtd.log', 'libvirt-log', 'log'],
+            ['sh', '-c', 'tar -czf /tmp/qemu.tar.gz /var/log/libvirt/qemu && cat /tmp/qemu.tar.gz', 'qemu.tar.gz', 'log'],
 
             # 配置文件
             ['cat', '/etc/cvk-ha/cvk-ha.yaml', 'cvk-ha-yaml', 'config'],
@@ -214,3 +215,4 @@ if __name__ == "__main__":
         tar_path = '/tmp/auto_log.tar'
         create_tarball(temp_dir, tar_path)
         print_with_color(f"Data saved to {tar_path}", "blue")
+
