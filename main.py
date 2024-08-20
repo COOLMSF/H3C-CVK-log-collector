@@ -2,6 +2,7 @@ import os
 import subprocess
 import tempfile
 import tarfile
+import json
 
 g_last_ndays = 3
 
@@ -34,10 +35,20 @@ def print_with_color(text, color):
     else:
         print(text)
 
+def get_cvk_master_ip():
+    return json.load(open('/var/lib/cvk-ha/nodes.json'))['MasterNode']['ManageIp']
+
 def run_commands_and_collect_logs(temp_dir, log_types):
     # @ [0]是要执行的命令
     # @ [1:-1]是命令的参数
     # @ [-1] 是要将命令输出结果保存的文件名称
+
+
+    try:
+        cvk_master_ip = get_cvk_master_ip()
+    except Exception as e:
+        print_with_color(f"Failed to get master ip: {e}", "red")
+        # return
 
     common_commands = [
 
@@ -95,7 +106,13 @@ def run_commands_and_collect_logs(temp_dir, log_types):
         ],
         'compute': [
             # 日志文件
-            ['cat', '/var/log/cvk-ha/cvk-ha.log', 'cvk-ha-log', 'log'],
+            ['sh', '-c', f'find /var/log/cvk-ha/ -type f -mtime -{g_last_ndays} | tar -czf /tmp/cvk-ha.tar.gz -T - && cat /tmp/cvk-ha.tar.gz', 'cvk-ha.tar.gz', 'log'],
+
+            # 获取master节点cvk-ha日志
+            # ['sh', '-c', f'master_ip=$(python3 -c "import json; print(f\"{json.load(open('/var/lib/cvk-ha/nodes.json'))['MasterNode']['ManageIp']}\")"); G_LAST_NDAYS={g_last_ndays}; ssh root@$master_ip "find /var/log/cvk-ha/ -type f -mtime -$G_LAST_NDAYS  | tar -czf /tmp/cvk-master-ha.tar.gz -T - && cat /tmp/cvk-master-ha.tar.gz"', 'log'],
+
+            ['sh', '-c', f'ssh root@{cvk_master_ip} "find /var/log/cvk-ha/ -type f -mtime -{g_last_ndays} | tar -czf /tmp/cvk-master-ha.tar.gz -T - && cat /tmp/cvk-master-ha.tar.gz"', 'cvk-master-ha-log.tar.gz', 'log'],
+
             ['cat', '/var/log/libvirt/libvirtd.log', 'libvirt-log', 'log'],
             ['sh', '-c', 'tar -czf /tmp/qemu.tar.gz /var/log/libvirt/qemu && cat /tmp/qemu.tar.gz', 'qemu.tar.gz', 'log'],
 
