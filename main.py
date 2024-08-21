@@ -6,6 +6,9 @@ import json
 
 g_last_ndays = 3
 
+banner_top = "============================================================================="
+banner_btm = "============================================================================="
+
 common_err_msgs = {
     "err",
     "error", 
@@ -53,26 +56,28 @@ def run_commands_and_collect_logs(temp_dir, log_types):
     common_commands = [
 
         # 服务状态
-        ['bash', '-c', 'for service in cvk-agent cvk-ha network-cvk-agent openvswitch ovn-northd frr; do echo "$service: $(systemctl is-active $service)"; done', 'network-service-status', 'info'],
+        ['bash', '-c', f'echo "{banner_top}\nService Status:"; for service in cvk-agent cvk-ha network-cvk-agent openvswitch ovn-northd frr; do echo "$service: $(systemctl is-active $service)"; done; echo {banner_btm}', 'network-service-status', 'info'],
+
         # 日志文件
         # TODO: convert dmesg timestap
         ['dmesg', 'dmesg-log', 'log'], 
-        ['cat', '/var/log/messages', 'messages-log', 'log'],
-        ['cat', '/var/log/dmesg.old', 'dmesg-old-log', 'log'], 
+        ['cat', '/var/log/messages', 'messages', 'log'],
+        ['cat', '/var/log/dmesg.old', 'dmesg.old', 'log'], 
 
         # 配置文件
 
         # 主机信息
     #     ['sh', '-c', 
-    #      'echo -e "Host Info:\n\n$(hostname)\n\nKernel Version:\n\n$(uname -a)\n\nDisk Info:\n\n$(df -h)\n\nMem Info:\n\n$(free -h)\n\nCVK Version:\n\n$(cat /etc/cas_cvk-version)\n\nCPU Info: $(lscpu | grep -E "Architecture|Vendor ID|Model name")\n\nCPU Utilization: $(mpstat -A)\n\n"', 
+    #      f'''
+    #         echo "{banner_top}";
+    #         echo -e "Host Info:\n\n$(hostname)\n\nKernel Version:\n\n$(uname -a)\n\nDisk Info:\n\n$(df -h)\n\nMem Info:\n\n$(free -h)\n\nCVK Version:\n\n$(cat /etc/cas_cvk-version)\n\nCPU Info:\n\n$(lscpu | grep -E "Architecture|Vendor ID|Model name")\n\n;echo {banner_btm}"''', 
     #      'host-info', 'info'],
     # ]
         ['sh', '-c', 
-         'echo -e "\
-            Host Info:\n\n \
-            $(hostname)\n\n \
-            Kernel Version:\n\n \
-            $(uname -a)\n\nDisk Info:\n\n$(df -h)\n\nMem Info:\n\n$(free -h)\n\nCVK Version:\n\n$(cat /etc/cas_cvk-version)\n\nCPU Info: $(lscpu | grep -E "Architecture|Vendor ID|Model name")\n\nCPU Utilization: $(mpstat -A)\n\n"', 
+         f'''
+            echo -e "{banner_top}\nHost Info:\n$(hostname)\n{banner_btm}\nKernel Version:\n$(uname -a)\n{banner_btm}\nDisk Info:\n$(df -h)\n{banner_btm}\nMem Info:\n$(free -h)\n{banner_btm}\nCVK Version:\n$(cat /etc/cas_cvk-version)\n{banner_btm}\nCPU Info:\n$(lscpu | grep -E "Architecture|Vendor ID|Model name")\n{banner_btm}\n
+            "
+        ''', 
          'host-info', 'info'],
     ]
 
@@ -100,9 +105,8 @@ def run_commands_and_collect_logs(temp_dir, log_types):
             ['cat', '/etc/frr/bgpd.conf', 'frr-config', 'config'],
 
             # 版本信息
-            ['sh', '-c', 'rpm -qa | grep -E "cvk-agent|network-cvk-agent|openvswitch|ovn|frr"', 'cvk-agent', 'network-component-version', 'info'],
+            ['sh', '-c', f'echo -e "{banner_top}\nNetwork Component Versions:\n$(rpm -qa | grep -E "cvk-agent|network-cvk-agent|openvswitch|ovn|frr")\n{banner_btm}\n"', 'cvk-agent', 'network-component-version', 'info'],
             # 其他信息
-
         ],
         'compute': [
             # 日志文件
@@ -113,15 +117,14 @@ def run_commands_and_collect_logs(temp_dir, log_types):
 
             ['sh', '-c', f'ssh root@{cvk_master_ip} "find /var/log/cvk-ha/ -type f -mtime -{g_last_ndays} | tar -czf /tmp/cvk-master-ha.tar.gz -T - && cat /tmp/cvk-master-ha.tar.gz"', 'cvk-master-ha-log.tar.gz', 'log'],
 
-            ['cat', '/var/log/libvirt/libvirtd.log', 'libvirt-log', 'log'],
+            ['cat', '/var/log/libvirt/libvirtd.log', 'libvirt.log', 'log'],
             ['sh', '-c', 'tar -czf /tmp/qemu.tar.gz /var/log/libvirt/qemu && cat /tmp/qemu.tar.gz', 'qemu.tar.gz', 'log'],
 
             # 配置文件
             ['cat', '/etc/cvk-ha/cvk-ha.yaml', 'cvk-ha-yaml', 'config'],
 
             # 版本信息
-            ['sh', '-c', 'rpm -qa | grep -E "cvk-agent|cvk-ha"', 'compute-component-version', 'info'],
-
+            ['sh', '-c', f'echo -e "{banner_top}\nCompute Component Versions:\n$(rpm -qa | grep -E "cvk-agent|cvk-ha")\n{banner_btm}\n"', 'compute-component-version', 'info'],
             # 其他信息
         ],
     }
