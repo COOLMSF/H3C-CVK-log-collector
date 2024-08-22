@@ -10,3 +10,8 @@
 
 4. 收集CVK agent相关信息
 
+
+## 运行结果
+
+![./img/result.png]
+
