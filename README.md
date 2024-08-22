@@ -13,5 +13,5 @@
 
 ## 运行结果
 
-![./img/result.png]
+!(result)[./img/result.png]
 
