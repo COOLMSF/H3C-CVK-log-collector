@@ -8,6 +8,7 @@ import tempfile
 import tarfile
 import json
 import shutil
+import time
 
 g_last_ndays = 3
 
@@ -42,6 +43,25 @@ def print_with_color(text, color):
         print(f"{color_codes[color]}{text}{end_code}")
     else:
         print(text)
+
+
+def cleanup_recent_tar_files(project_name, directory, minutes=10):
+    current_time = time.time()
+    cutoff_time = current_time - (minutes * 60)
+
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if file.endswith('.tar.gz'):
+                file_path = os.path.join(root, file)
+                file_stat = os.stat(file_path)
+                file_mtime = file_stat.st_mtime
+
+                if file_mtime >= cutoff_time:
+                    os.remove(file_path)
+                    print_with_color(f"Deleted recent tar file: {file_path}", "yellow")
+
+    # 删除对应目录
+    os.system(f'rm -rf {project_name}')
 
 def get_cvk_master_ip():
     return json.load(open('/var/lib/cvk-ha/nodes.json'))['MasterNode']['ManageIp']
@@ -188,12 +208,58 @@ def run_commands_and_collect_logs(temp_dir, log_types):
 
     return collected_logs
 
+# def create_tarball(temp_dir, tar_path):
+#     with tarfile.open(tar_path, 'w') as tar:
+#         for root, _, files in os.walk(temp_dir):
+#             for file in files:
+#                 file_path = os.path.join(root, file)
+#                 arcname = os.path.relpath(file_path, temp_dir)
+#                 tar.add(file_path, arcname=arcname)
+
+# def create_tarball(temp_dir, tar_path):
+#     # Extract the base name of the tarball (without extension)
+#     tar_base_name = os.path.splitext(os.path.basename(tar_path))[0]
+#     
+#     # Create a top-level directory name
+#     top_level_dir = os.path.join(temp_dir, tar_base_name)
+#     
+#     # Ensure the top-level directory exists
+#     os.makedirs(top_level_dir, exist_ok=True)
+#     
+#     # Move all files from temp_dir to the top-level directory
+#     for root, _, files in os.walk(temp_dir):
+#         for file in files:
+#             file_path = os.path.join(root, file)
+#             new_file_path = os.path.join(top_level_dir, os.path.relpath(file_path, temp_dir))
+#             os.makedirs(os.path.dirname(new_file_path), exist_ok=True)
+#             os.rename(file_path, new_file_path)
+#     
+#     # Create the tarball
+#     with tarfile.open(tar_path, 'w') as tar:
+#         for root, _, files in os.walk(top_level_dir):
+#             for file in files:
+#                 file_path = os.path.join(root, file)
+#                 arcname = os.path.relpath(file_path, top_level_dir)
+#                 tar.add(file_path, arcname=arcname)
+#     
+#     # Clean up: Remove the top-level directory
+#     for root, _, files in os.walk(top_level_dir, topdown=False):
+#         for file in files:
+#             os.remove(os.path.join(root, file))
+#         os.rmdir(root)
+
+
 def create_tarball(temp_dir, tar_path):
+    # Extract the base name of the tarball (without extension)
+    tar_base_name = os.path.splitext(os.path.basename(tar_path))[0]
+    
+    # Create the tarball
     with tarfile.open(tar_path, 'w') as tar:
         for root, _, files in os.walk(temp_dir):
             for file in files:
                 file_path = os.path.join(root, file)
-                arcname = os.path.relpath(file_path, temp_dir)
+                # Create the relative path with the top-level directory
+                arcname = os.path.join(tar_base_name, os.path.relpath(file_path, temp_dir))
                 tar.add(file_path, arcname=arcname)
 
 def get_user_input():
@@ -247,10 +313,10 @@ if __name__ == "__main__":
     hostname = socket.gethostname()
 
     if not project_name:
-        tar_path = "/tmp/" + project_name + hostname + '-' + current_datetime
+        tar_path = "/tmp/" + project_name + '-' + hostname + '-' + current_datetime
     else:
         tar_path = default_project_name
-        tar_path = "/tmp/" + project_name + hostname + '-' + current_datetime
+        tar_path = "/tmp/" + project_name + '-' + hostname + '-' + current_datetime
 
     tar_path = Path(tar_path)
 
@@ -265,5 +331,8 @@ if __name__ == "__main__":
         collected_logs = run_commands_and_collect_logs(tar_path.name, log_types)
 
         create_tarball(tar_path.name, tar_path.name + '.tar')
-        print_with_color(f"Data saved to {tar_path}.tar", "blue")
+        print_with_color(f"Data saved to {tar_path}.tar", "red")
+        print_with_color(f"Cleaning up...", "yellow")
+        # 删除最近10分钟的临时日志文件，和项目相关文件
+        cleanup_recent_tar_files(tar_path.name, "/tmp", minutes=10)
 
