@@ -1,8 +1,13 @@
+from datetime import datetime
+from pathlib import Path
+import socket
 import os
+from os.path import isdir
 import subprocess
 import tempfile
 import tarfile
 import json
+import shutil
 
 g_last_ndays = 3
 
@@ -230,9 +235,35 @@ def get_user_input():
 
 if __name__ == "__main__":
     log_types = get_user_input()
-    with tempfile.TemporaryDirectory(dir='/tmp/') as temp_dir:
-        collected_logs = run_commands_and_collect_logs(temp_dir, log_types)
-        tar_path = '/tmp/auto_log.tar'
-        create_tarball(temp_dir, tar_path)
-        print_with_color(f"Data saved to {tar_path}", "blue")
+    default_project_name = 'test'
+    print_with_color(f"enter project name(default is:%s)" % default_project_name, "green")
+    project_name = input()
+
+    # Get the current date and time
+    current_datetime = datetime.now()
+    # Format the date and time as YYYY-MM-DD HH:MM:SS
+    current_datetime = current_datetime.strftime("%Y-%m-%d-%H%M%S")
+
+    hostname = socket.gethostname()
+
+    if not project_name:
+        tar_path = "/tmp/" + project_name + hostname + '-' + current_datetime
+    else:
+        tar_path = default_project_name
+        tar_path = "/tmp/" + project_name + hostname + '-' + current_datetime
+
+    tar_path = Path(tar_path)
+
+    if os.path.isdir(tar_path):
+        print_with_color(f"Directory {tar_path.name} already exists. Delete it.", "red")
+        # Remove the directory and its contents recursively
+        shutil.rmtree(tar_path)
+    else:
+        # Create the directory
+        tar_path.mkdir(parents=True, exist_ok=True)
+        print_with_color(f"Directory '{tar_path.name}' created.", "green")
+        collected_logs = run_commands_and_collect_logs(tar_path.name, log_types)
+
+        create_tarball(tar_path.name, tar_path.name + '.tar')
+        print_with_color(f"Data saved to {tar_path}.tar", "blue")
 
